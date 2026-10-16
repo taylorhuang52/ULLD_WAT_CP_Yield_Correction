@@ -24,7 +24,7 @@ h1{font-size:22px}h2{font-size:17px;margin-top:32px}.card{background:var(--card)
 .hm{overflow-x:auto}table{border-collapse:collapse;font-size:11px}td,th{padding:3px 5px;text-align:center;border:1px solid var(--bd);white-space:nowrap}th.l{text-align:left;position:sticky;left:0;background:var(--card)}
 td.c{color:#111;min-width:34px}.k li{margin:4px 0}
 .tabs{display:flex;gap:8px;margin-bottom:8px}.tabs button{padding:8px 16px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;cursor:pointer;font-size:14px}.tabs button.on{background:#2563eb;color:#fff;border-color:#2563eb}#p2{display:none}table.t2 td,table.t2 th{font-size:12px;padding:4px 8px}</style></head><body><div class="tabs"><button id="b1" class="on" onclick="showP(1)">第 1 頁：WAT 參數 vs Yield</button><button id="b2" onclick="showP(2)">第 2 頁：CP Yield vs 測項 / Lot Type</button></div><div id="p1">
-<h1>WAT / CP Yield 與 WAT 參數之相關性分析</h1>
+<h1>ULLD WAT / CP Yield 與 WAT 參數之相關性分析</h1>
 <p class="mut">資料：ULLD_WAT_CP_Summary（3058 個 Lot）。各片 Yield 指 #1~#25（每片 wafer 的 yield，其平均即 WAT Yield）。數值型參數採 Spearman 等級相關（對離群值較穩健，另附 Pearson）；Part No 為類別變數，以相關比 η²（0~1，代表被 Part No 解釋的變異比例）衡量。</p>
 <div class="card"><b>重點結論</b><ul class="k" id="key"></ul></div>
 
