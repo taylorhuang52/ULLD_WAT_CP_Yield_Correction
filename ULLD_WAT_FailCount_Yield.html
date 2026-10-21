@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WAT Fail Count / Yield 計算工具</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1c2330;--mut:#6b7587;--bd:#dde1e8;--ac:#2563eb;--hd:#eef1f6;--ok:#15803d}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--card:#1b2029;--fg:#e6e9ef;--mut:#8f9aae;--bd:#2d3542;--ac:#6ea0ff;--hd:#232a36;--ok:#4ade80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "Segoe UI","Microsoft JhengHei",system-ui,sans-serif}
+main{max-width:1400px;margin:0 auto;padding:20px}
+h1{font-size:20px;margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button,select,input[type=text],textarea{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+button:hover{filter:brightness(1.06)}
+textarea{width:100%;min-height:54px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+#drop{border:2px dashed var(--bd);border-radius:10px;padding:18px;text-align:center;color:var(--mut);margin-top:10px}
+#drop.on{border-color:var(--ac);color:var(--ac)}
+.hint{color:var(--mut);font-size:12.5px;margin:6px 0 0}
+#msg{margin-top:8px;font-size:13px;min-height:18px}
+.err{color:#dc2626}
+.tabs button{border-radius:6px 6px 0 0}.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:8px;max-height:72vh}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 9px;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);white-space:nowrap;text-align:right}
+th{background:var(--hd);position:sticky;top:0;z-index:2;font-weight:600}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--hd);z-index:1}
+th:first-child{z-index:3}
+tr.tot td{font-weight:700;background:var(--hd)}
+td.z{color:var(--mut)}td.na{color:var(--mut);text-align:center}
+tr.clk{cursor:pointer}tr.clk:hover td{outline:1px solid var(--ac)}
+.bad{color:#dc2626;font-weight:700}
+.kpi{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px}.kpi b{font-size:18px}.kpi span{color:var(--mut);font-size:12px;display:block}
+</style>
+</head>
+<body>
+<main>
+<h1>WAT 各測項 Fail Count / Yield 計算工具</h1>
+
+<div class="card">
+  <div class="row">
+    <button class="pri" onclick="fFiles.click()">選擇檔案 (.raw.xls / .qc9.txt / .zip)</button>
+    <button onclick="fDir.click()">選擇資料夾</button>
+    <button onclick="clearAll()">清除全部</button>
+    <input id="fFiles" type="file" multiple hidden>
+    <input id="fDir" type="file" webkitdirectory multiple hidden>
+  </div>
+  <div id="drop">也可以把檔案、資料夾或 zip 直接拖曳到這裡</div>
+  <p class="hint" style="margin-top:12px">指定檔案路徑 / URL（每行一個，可為 .raw.xls、.qc9.txt 或 .zip）：</p>
+  <textarea id="paths" placeholder="例：data/RP69195.raw.xls&#10;data/ULLD_WAT.zip"></textarea>
+  <div class="row" style="margin-top:6px"><button onclick="loadPaths()">依路徑載入</button>
+  <span class="hint" style="margin:0">瀏覽器無法直接讀取本機絕對路徑（如 C:\…）；路徑載入需用 http 開啟本頁（例如在資料夾執行 <code>python -m http.server</code>），路徑為相對或 http 網址。一般本機檔案請用上方「選擇檔案」。</span></div>
+  <div id="msg"></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <label>Fail 判定：
+      <select id="mode">
+        <option value="q">資料標記 “?”（Scrap fail，對應 qc9 Yield）</option>
+        <option value="qx">資料標記 “?” + “x”（含 Control / OOC）</option>
+        <option value="scrap">依檔頭 Scrap Limit 重算</option>
+        <option value="ctrl">依檔頭 Control Limit 重算</option>
+      </select></label>
+    <label>顯示：
+      <select id="view"><option value="count">Fail count</option><option value="yield">Yield %</option><option value="both">兩者</option></select></label>
+    <button onclick="exportCSV()">匯出目前表格 CSV</button>
+  </div>
+</div>
+
+<div id="out"></div>
+</main>
+
+<script>
+/* ========== 核心：解析 / 判定 / 統計（不依賴 DOM） ========== */
+const dec = b => new TextDecoder('windows-1252').decode(b);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function unzip(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let e = buf.byteLength - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('不是有效的 zip');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true); const out = [];
+  for (let i = 0; i < n; i++){
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), cs = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true), name = dec(u8.subarray(p + 46, p + 46 + nl));
+    p += 46 + nl + xl + cl;
+    if (name.endsWith('/') || name.includes('__MACOSX')) continue;
+    const st = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    const data = u8.subarray(st, st + cs); let bytes;
+    if (method === 0) bytes = data;
+    else if (method === 8) bytes = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    else continue;
+    out.push({name, text: dec(bytes)});
+  }
+  return out;
+}
+
+function parseRaw(text, fname){
+  const rows = text.split(/\r?\n/).map(l => l.split('\t').map(s => s.trim()));
+  const hi = rows.findIndex(r => /^LOT_ID/i.test(r[0]));
+  const pi = rows.findIndex(r => /^Parameter/i.test(r[0]));
+  if (hi < 0 || pi < 0) throw new Error('格式不符：' + fname);
+  const names = rows[pi].slice(1);
+  const limits = {};
+  rows.slice(pi + 1, pi + 8).forEach(r => { if (/^(Control|Scrap)_(High|Low)$/i.test(r[0])) limits[r[0].toLowerCase()] = r.slice(1).map(parseFloat); });
+  const tIdx = names.map((n, i) => n && !/^[XY]$/i.test(n) ? i : -1).filter(i => i >= 0);
+  const sites = [];
+  rows.slice(pi + 1).forEach(r => { const m = /^(\d+)_(\d+)$/.exec(r[0]); if (m) sites.push({wafer: m[1], cells: r.slice(1)}); });
+  const pc = rows[hi].findIndex(n => /^PRODUCT$/i.test(n));
+  return {lot: rows[hi + 1][0], product: pc >= 0 ? (rows[hi + 1][pc] || '') : '', file: fname, names, tIdx, limits, sites};
+}
+
+function parseQc9(text){
+  const lot = ((/LOT ID\s*:\s*(\S+)/.exec(text) || [])[1] || '').replace(/_\d+$/, '');
+  const w = {};
+  text.split(/\r?\n/).forEach(l => { const m = /^\s+(\d+)\s+(\d+)\s+(\d+)\s+(PASS|FAIL)\s+(\d+)/.exec(l); if (m) w[m[1]] = {total: +m[2], pass: +m[3]}; });
+  return {lot, wafers: w};
+}
+
+// 回傳 1=fail, 0=pass, -1=無資料
+function judge(cell, i, lim, mode){
+  if (cell === undefined || cell === '') return -1;
+  const m = /^([^\d\s.+\-])\s*(.*)$/.exec(cell);
+  const mark = m ? m[1] : '', num = m ? m[2] : cell;
+  if (mode === 'q') return mark === '?' ? 1 : 0;
+  if (mode === 'qx') return (mark === '?' || mark === 'x') ? 1 : 0;
+  const v = parseFloat(num); if (isNaN(v)) return 1;
+  const p = mode === 'scrap' ? 'scrap' : 'control';
+  const hi = lim[p + '_high'] && lim[p + '_high'][i], lo = lim[p + '_low'] && lim[p + '_low'][i];
+  return ((hi === hi && hi !== undefined && v > hi) || (lo === lo && lo !== undefined && v < lo)) ? 1 : 0;
+}
+
+function analyze(L, mode){
+  const nt = L.tIdx.length, W = {};
+  for (const s of L.sites){
+    const w = W[s.wafer] || (W[s.wafer] = {n: 0, pass: 0, fail: Array(nt).fill(0), tot: Array(nt).fill(0)});
+    w.n++; let bad = false;
+    L.tIdx.forEach((ci, t) => {
+      const r = judge(s.cells[ci], ci, L.limits, mode);
+      if (r < 0) return;
+      w.tot[t]++; if (r){ w.fail[t]++; bad = true; }
+    });
+    if (!bad) w.pass++;
+  }
+  const ids = Object.keys(W).sort((a, b) => a - b);
+  const T = {n: 0, pass: 0, fail: Array(nt).fill(0), tot: Array(nt).fill(0)};
+  ids.forEach(k => { const w = W[k]; T.n += w.n; T.pass += w.pass; w.fail.forEach((f, t) => { T.fail[t] += f; T.tot[t] += w.tot[t]; }); });
+  return {ids, W, T, tests: L.tIdx.map(i => L.names[i])};
+}
+/* ========== UI ========== */
+const S = {raw: {}, qc9: {}, lot: null, tab: 'over'};
+const $ = id => document.getElementById(id);
+const say = (t, err) => { $('msg').innerHTML = err ? '<span class="err">' + esc(t) + '</span>' : esc(t); };
+
+async function ingest(list){   // list: [{name, text}]
+  let r = 0, q = 0, skip = 0;
+  for (const f of list){
+    try{
+      if (/^\s*LOT_ID/i.test(f.text.slice(0, 200))){ const L = parseRaw(f.text, f.name); S.raw[L.lot] = L; r++; }
+      else if (/WAFER SUMMARY REPORT/.test(f.text.slice(0, 600))){ const Q = parseQc9(f.text); S.qc9[Q.lot] = Q; q++; }
+      else skip++;
+    }catch(e){ say(e.message, true); }
+  }
+  if (!S.lot || !S.raw[S.lot]) S.lot = Object.keys(S.raw)[0] || null;
+  say(`已載入 ${r} 個測試檔、${q} 個 qc9 報表` + (skip ? `，略過 ${skip} 個無法辨識的檔案` : '') + `；目前共 ${Object.keys(S.raw).length} 批。`);
+  render();
+}
+async function readFiles(files){
+  const list = [];
+  for (const f of files){
+    const buf = await f.arrayBuffer();
+    if (/\.zip$/i.test(f.name)) { try { list.push(...await unzip(buf)); } catch (e) { say(f.name + '：' + e.message, true); } }
+    else list.push({name: f.name, text: dec(buf)});
+  }
+  await ingest(list);
+}
+async function loadPaths(){
+  const ps = $('paths').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean), list = [];
+  for (const p of ps){
+    try{
+      const res = await fetch(p); if (!res.ok) throw new Error(res.status);
+      const buf = await res.arrayBuffer();
+      if (/\.zip$/i.test(p)) list.push(...await unzip(buf)); else list.push({name: p, text: dec(buf)});
+    }catch(e){ say('無法讀取 ' + p + '（請確認以 http 開啟本頁且路徑正確）', true); }
+  }
+  if (list.length) await ingest(list);
+}
+function clearAll(){ S.raw = {}; S.qc9 = {}; S.lot = null; say(''); render(); }
+
+// 拖曳（含資料夾）
+async function walk(entry, out){
+  if (entry.isFile) await new Promise(res => entry.file(f => { out.push(f); res(); }));
+  else if (entry.isDirectory){
+    const rd = entry.createReader();
+    for (;;){ const es = await new Promise(res => rd.readEntries(res)); if (!es.length) break; for (const e of es) await walk(e, out); }
+  }
+}
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', async e => {
+  const files = [], items = [...e.dataTransfer.items];
+  const ents = items.map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (ents.length) for (const en of ents) await walk(en, files); else files.push(...e.dataTransfer.files);
+  readFiles(files);
+});
+$('fFiles').onchange = e => { readFiles([...e.target.files]); e.target.value = ''; };
+$('fDir').onchange = e => { readFiles([...e.target.files]); e.target.value = ''; };
+$('mode').onchange = $('view').onchange = () => render();
+
+const fmtY = (f, t) => t ? ((t - f) / t * 100).toFixed(1) + '%' : '–';
+const P = (txt, bad) => ({txt: String(txt), bad});
+function cm(f, t){   // 測項儲存格：HTML 與 CSV 共用同一份文字
+  if (!t) return {txt: '–', na: 1};
+  const y = fmtY(f, t), v = $('view').value;
+  return {txt: String(v === 'count' ? f : v === 'yield' ? y : `${f} (${y})`), f, t, y};
+}
+function cellHTML(c){
+  if (c.na) return '<td class="na">–</td>';
+  if (c.t !== undefined){
+    const a = c.f ? Math.min(.85, c.f / c.t * 2 + .12) : 0;
+    return `<td class="${c.f ? '' : 'z'}" style="${c.f ? `background:rgba(220,38,38,${a.toFixed(2)})` : ''}" title="fail ${c.f} / ${c.t}，yield ${c.y}">${esc(c.txt)}</td>`;
+  }
+  return `<td class="${c.bad ? 'bad' : ''}">${esc(c.txt)}</td>`;
+}
+function analyzed(){ const m = $('mode').value, o = {}; for (const k in S.raw) o[k] = analyze(S.raw[k], m); return o; }
+
+// 目前顯示的表格模型：{head, rows:[{cells, cls, click}], name}
+function model(A, keys){
+  if (S.tab === 'over'){
+    const all = []; keys.forEach(k => A[k].tests.forEach(t => { if (!all.includes(t)) all.push(t); }));
+    return {name: 'overview', head: ['Lot', 'PRODUCT ID', '片數', 'Sites', 'Pass', 'Yield', ...all], rows: keys.map(k => {
+      const a = A[k], T = a.T;
+      return {click: k, cells: [P(k), P(S.raw[k].product), P(a.ids.length), P(T.n), P(T.pass), P(fmtY(T.n - T.pass, T.n)),
+        ...all.map(t => { const i = a.tests.indexOf(t); return i < 0 ? {txt: '–', na: 1} : cm(T.fail[i], T.tot[i]); })]};
+    })};
+  }
+  const a = A[S.lot], T = a.T, q = (S.qc9[S.lot] || {}).wafers, pr = S.raw[S.lot].product;
+  const rows = a.ids.map(id => {
+    const w = a.W[id], qq = q && q[id];
+    return {cells: [P(S.lot), P(pr), P(id), P(w.n), P(w.pass), P(w.n - w.pass), P(fmtY(w.n - w.pass, w.n)),
+      ...(q ? [P(qq ? qq.pass : '–', qq && qq.pass !== w.pass)] : []), ...w.fail.map((f, t) => cm(f, w.tot[t]))]};
+  });
+  rows.push({cls: 'tot', cells: [P(S.lot), P(pr), P('合計'), P(T.n), P(T.pass), P(T.n - T.pass), P(fmtY(T.n - T.pass, T.n)),
+    ...(q ? [P('')] : []), ...T.fail.map((f, t) => cm(f, T.tot[t]))]});
+  return {name: S.lot, head: ['Lot', 'PRODUCT ID', 'Wafer', 'Sites', 'Pass', 'Fail', 'Yield', ...(q ? ['qc9 Pass'] : []), ...a.tests], rows};
+}
+
+function render(){
+  const out = $('out'), keys = Object.keys(S.raw);
+  if (!keys.length){ out.innerHTML = '<div class="card hint">尚未載入資料。</div>'; return; }
+  if (!S.raw[S.lot]) S.lot = keys[0];
+  const A = analyzed(), M = model(A, keys);
+  let h = `<div class="tabs row" style="gap:4px"><button class="${S.tab === 'over' ? 'on' : ''}" onclick="S.tab='over';render()">各批總覽</button><button class="${S.tab === 'det' ? 'on' : ''}" onclick="S.tab='det';render()">單批各片明細</button></div><div class="card">`;
+  if (S.tab === 'det'){
+    const a = A[S.lot], T = a.T;
+    h += `<div class="row" style="margin-bottom:10px"><label>Lot：<select onchange="S.lot=this.value;render()">${keys.map(k => `<option ${k === S.lot ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></label><span class="hint" style="margin:0">PRODUCT ID：${esc(S.raw[S.lot].product)}　${esc(S.raw[S.lot].file)}</span></div>`;
+    h += `<div class="kpi"><div><b>${a.ids.length}</b><span>片數</span></div><div><b>${T.n}</b><span>Sites</span></div><div><b>${T.pass}</b><span>Pass sites</span></div><div><b>${fmtY(T.n - T.pass, T.n)}</b><span>Lot Yield</span></div></div>`;
+  }
+  h += `<div class="wrap"><table><tr>${M.head.map(t => `<th>${esc(t)}</th>`).join('')}</tr>` +
+    M.rows.map(r => `<tr class="${(r.cls || '') + (r.click ? ' clk' : '')}"${r.click ? ` onclick="S.lot='${esc(r.click)}';S.tab='det';render()"` : ''}>${r.cells.map(cellHTML).join('')}</tr>`).join('') + '</table></div>';
+  h += S.tab === 'over' ? '<p class="hint">點選任一批可查看每片明細；Yield＝所有測項皆 pass 的 site 比例。</p>'
+    : '<p class="hint">滑鼠移到格子上可看 fail / 總數與 yield；紅色 qc9 Pass 表示與 qc9 報表的 Pass sites 不一致。</p>';
+  out.innerHTML = h + '</div>';
+}
+
+function exportCSV(){   // 與畫面上目前的表格（含顯示格式）完全相同
+  if (!Object.keys(S.raw).length) return say('沒有可匯出的資料。', true);
+  const M = model(analyzed(), Object.keys(S.raw));
+  const q = c => /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c;
+  const csv = '\ufeff' + [M.head, ...M.rows.map(r => r.cells.map(c => c.txt))].map(r => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+  a.download = 'wat_' + M.name + '.csv'; a.click();
+}
+render();
+</script>
+</body>
+</html>
