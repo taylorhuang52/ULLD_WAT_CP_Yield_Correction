@@ -1,0 +1,75 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ULLD WAT/CP 生產、出貨與 CP 投入量分析（已排除空白值）</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#5f6b7a;--bd:#dfe3e8;--ac:#2a6fdb;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171c;--card:#1d2127;--tx:#e8ebef;--mu:#9aa5b3;--bd:#2c323a;--ac:#6ea2ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171c;--card:#1d2127;--tx:#e8ebef;--mu:#9aa5b3;--bd:#2c323a;--ac:#6ea2ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;display:flex;flex-direction:column}
+#stage{flex:1;min-height:0;padding:20px 28px 8px;overflow:auto}
+h1{font-size:clamp(26px,4vw,44px);margin:0 0 8px}h2{font-size:clamp(20px,2.6vw,30px);margin:0 0 4px}
+.sub{color:var(--mu);margin:0 0 14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:20px 0}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+.kpi b{display:block;font-size:clamp(22px,3vw,34px);color:var(--ac)}.kpi span{color:var(--mu);font-size:14px}
+ul{line-height:1.9;color:var(--mu)}
+.row{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+.chart{flex:3 1 520px;min-width:0;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px}
+.chart svg{width:100%;height:auto;display:block}
+.leg{flex:1 1 220px;font-size:14px}
+.leg div{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd)}
+.leg i{width:12px;height:12px;border-radius:3px;flex:none}.leg em{margin-left:auto;font-style:normal;color:var(--mu);white-space:nowrap}
+nav{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px;border-top:1px solid var(--bd);background:var(--card)}
+button{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px 18px;font-size:15px;cursor:pointer}
+button:hover{border-color:var(--ac)}#pg{color:var(--mu);min-width:56px;text-align:center}
+table{border-collapse:collapse;width:100%;font-size:14px;white-space:nowrap}th,td{padding:10px 12px;border-bottom:1px solid var(--bd);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:600}.tt td{font-weight:700;background:var(--bg)}
+text{fill:var(--mu);font-size:12px}.tot{fill:var(--tx);font-weight:600}
+</style></head><body>
+<div id="stage"></div>
+<nav><button id="pv">← 上一頁</button><span id="pg"></span><button id="nx">下一頁 →</button></nav>
+<script>
+const D={"start": "2025-09-23", "end": "2026-11-02", "months": ["2025-09", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"], "lots": 3227, "removed": 5, "wafers": 80415, "shipW": 79660, "dies": 46479870.0, "shipD": 46043480.0, "cpD": 46840080.0, "lt25": 465, "avgPW": 24.685466377440346, "dropW": 755, "total": [14450.0, 4118828.0, 2980168.0, 1873876.0, 2668626.0, 3465110.0, 4264484.0, 5170788.0, 3762780.0, 4272576.0, 4306100.0, 4483546.0, 4954038.0, 144500.0], "totalS": [14450.0, 4099176.0, 2972654.0, 1850756.0, 2651286.0, 3435632.0, 4215932.0, 5110098.0, 3717696.0, 4218822.0, 4279512.0, 4434994.0, 4897972.0, 144500.0], "totalC": [14700.0, 4170096.0, 3024084.0, 1882776.0, 2697156.0, 3495072.0, 4288872.0, 5198508.0, 3782016.0, 4291812.0, 4353552.0, 4511724.0, 4982712.0, 147000.0], "Part No": {"03U": [0.0, 1393558.0, 1623602.0, 908038.0, 1487194.0, 2396388.0, 3297490.0, 2540888.0, 2810814.0, 2339744.0, 3843700.0, 4107846.0, 2353616.0, 144500.0], "07U": [14450.0, 1414366.0, 765850.0, 345644.0, 462400.0, 144500.0, 0.0, 939250.0, 375700.0, 1081438.0, 0.0, 0.0, 1776772.0, 0.0], "04U": [0.0, 620772.0, 475694.0, 231200.0, 545632.0, 606322.0, 533494.0, 563550.0, 576266.0, 187850.0, 317900.0, 303450.0, 86700.0, 0.0], "02U": [0.0, 488410.0, 115022.0, 273394.0, 144500.0, 289000.0, 375700.0, 375700.0, 0.0, 374544.0, 130050.0, 72250.0, 158950.0, 0.0], "06U": [0.0, 201722.0, 0.0, 115600.0, 28900.0, 28900.0, 43350.0, 216750.0, 0.0, 187850.0, 14450.0, 0.0, 245650.0, 0.0], "08U": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 14450.0, 534650.0, 0.0, 101150.0, 0.0, 0.0, 332350.0, 0.0]}, "Part No_S": {"03U": [0.0, 1383732.0, 1620134.0, 891854.0, 1474478.0, 2375002.0, 3257030.0, 2509098.0, 2795786.0, 2317202.0, 3820002.0, 4060450.0, 2343790.0, 144500.0], "07U": [14450.0, 1411476.0, 763538.0, 343332.0, 460666.0, 144500.0, 0.0, 932314.0, 350846.0, 1066410.0, 0.0, 0.0, 1735734.0, 0.0], "04U": [0.0, 614414.0, 474538.0, 229466.0, 543320.0, 602276.0, 531760.0, 555458.0, 571064.0, 183226.0, 317322.0, 302294.0, 86122.0, 0.0], "02U": [0.0, 488410.0, 114444.0, 270504.0, 143922.0, 284954.0, 369342.0, 371654.0, 0.0, 370498.0, 127738.0, 72250.0, 158950.0, 0.0], "06U": [0.0, 201144.0, 0.0, 115600.0, 28900.0, 28900.0, 43350.0, 212704.0, 0.0, 181492.0, 14450.0, 0.0, 244494.0, 0.0], "08U": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 14450.0, 528870.0, 0.0, 99994.0, 0.0, 0.0, 328882.0, 0.0]}, "Part No_C": {"03U": [0.0, 1407672.0, 1648164.0, 907284.0, 1499988.0, 2416092.0, 3313380.0, 2552508.0, 2844156.0, 2357292.0, 3886092.0, 4130700.0, 2384340.0, 147000.0], "07U": [14700.0, 1435896.0, 776748.0, 349272.0, 468636.0, 147000.0, 0.0, 948444.0, 356916.0, 1084860.0, 0.0, 0.0, 1765764.0, 0.0], "04U": [0.0, 625044.0, 482748.0, 233436.0, 552720.0, 612696.0, 540960.0, 565068.0, 580944.0, 186396.0, 322812.0, 307524.0, 87612.0, 0.0], "02U": [0.0, 496860.0, 116424.0, 275184.0, 146412.0, 289884.0, 375732.0, 378084.0, 0.0, 376908.0, 129948.0, 73500.0, 161700.0, 0.0], "06U": [0.0, 204624.0, 0.0, 117600.0, 29400.0, 29400.0, 44100.0, 216384.0, 0.0, 184632.0, 14700.0, 0.0, 248724.0, 0.0], "08U": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 14700.0, 538020.0, 0.0, 101724.0, 0.0, 0.0, 334572.0, 0.0]}, "exk": "Part No", "ex": [{"k": "03U", "i": 29247378.0, "l": 254320.0, "e": 501610.0, "c": 29494668.0, "rate": 0.9913045196735243, "be": 0.9829931972789115}, {"k": "07U", "i": 7320370.0, "l": 97104.0, "e": 124970.0, "c": 7348236.0, "rate": 0.9867350967232531, "be": 0.9829931972789115}, {"k": "04U", "i": 5048830.0, "l": 37570.0, "e": 86700.0, "c": 5097960.0, "rate": 0.9925586720091586, "be": 0.9829931972789115}, {"k": "02U", "i": 2797520.0, "l": 24854.0, "e": 47970.0, "c": 2820636.0, "rate": 0.9911157024793389, "be": 0.9829931972789115}, {"k": "06U", "i": 1083172.0, "l": 12138.0, "e": 18530.0, "c": 1089564.0, "rate": 0.9887940234791889, "be": 0.9829931972789115}, {"k": "08U", "i": 982600.0, "l": 10404.0, "e": 16820.0, "c": 989016.0, "rate": 0.9894117647058823, "be": 0.9829931972789115}], "cmp": [{"k": "03U", "w": 50161, "W": 50601, "s": 28993058.0, "e": 501610.0, "c": 29494668.0}, {"k": "07U", "w": 12497, "W": 12665, "s": 7223266.0, "e": 124970.0, "c": 7348236.0}, {"k": "04U", "w": 8670, "W": 8735, "s": 5011260.0, "e": 86700.0, "c": 5097960.0}, {"k": "02U", "w": 4797, "W": 4840, "s": 2772666.0, "e": 47970.0, "c": 2820636.0}, {"k": "06U", "w": 1853, "W": 1874, "s": 1071034.0, "e": 18530.0, "c": 1089564.0}, {"k": "08U", "w": 1682, "W": 1700, "s": 972196.0, "e": 16820.0, "c": 989016.0}]};
+const PAL=["#2a6fdb","#f08a24","#2fa66a","#d64550","#8a63d2","#17a2b8","#c9a227","#e377c2","#7f8c8d","#6b4f3a","#a3c940"];
+const fmt=v=>(v/1e6).toFixed(2);
+const names={Station:"Station（測試機台）","Device Mapping":"Device Mapping","Part No":"Part No","EPI":"EPI（磊晶廠）",BGBM:"BGBM"};
+function chart(data){
+  const W=900,H=400,L=48,R=10,T=26,B=34,keys=Object.keys(data),n=D.months.length;
+  const tot=D.months.map((_,i)=>keys.reduce((s,k)=>s+data[k][i],0));
+  const mx=Math.ceil(Math.max(...tot)/1e6)*1e6*1.05||1,bw=(W-L-R)/n,y=v=>T+(H-T-B)*(1-v/mx);
+  let s=`<svg viewBox="0 0 ${W} ${H}">`;
+  for(let t=0;t<=4;t++){const v=mx/4*t;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity=".12"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${(v/1e6).toFixed(1)}</text>`}
+  D.months.forEach((m,i)=>{let c=0;keys.forEach((k,j)=>{const v=data[k][i];if(!v)return;s+=`<rect x="${L+i*bw+bw*.12}" width="${bw*.76}" y="${y(c+v)}" height="${y(c)-y(c+v)}" fill="${PAL[j%PAL.length]}"><title>${m} ${k}: ${fmt(v)}M</title></rect>`;c+=v});
+    s+=`<text class="tot" x="${L+i*bw+bw/2}" y="${y(c)-5}" text-anchor="middle">${fmt(c)}</text><text x="${L+i*bw+bw/2}" y="${H-12}" text-anchor="middle">${m.slice(2)}</text>`});
+  return s+`<text x="${L}" y="14">單位：百萬 die（Million die）</text></svg>`}
+const sm=a=>a.reduce((x,y)=>x+y,0);
+function legend(d,mode){const sf=['','_S','_C'][mode],data=D[d+sf],keys=Object.keys(data),all=keys.reduce((s,k)=>s+sm(data[k]),0);
+  return '<div class="leg">'+keys.map((k,j)=>{const t=sm(data[k]),x=mode==1?`・出貨率 ${(t/sm(D[d][k])*100).toFixed(1)}%`:mode==2?`・較出貨 +${(t/sm(D[d+'_S'][k])*100-100).toFixed(1)}%`:'';return `<div><i style="background:${PAL[j%PAL.length]}"></i>${k}<em>${fmt(t)}M・${(t/all*100).toFixed(1)}%${x}</em></div>`}).join('')+'</div>'}
+
+let mode=2;const tg=m=>{mode=m;go(p)};
+const tabs=()=>`<p>${[[2,'CP 實際投入'],[1,'晶圓廠出貨'],[0,'晶圓廠投入（未篩選良率）']].map(([i,n])=>`<button onclick="tg(${i})" ${mode==i?'style="border-color:var(--ac)"':''}>${n}</button>`).join(' ')}</p>`;
+const slides=[
+()=>`<h1>ULLD WAT/CP 生產、出貨與 CP 投入量分析</h1><p class="sub">資料期間 ${D.start} 至 ${D.end}（RUN_ON 日期）・已排除空白值的 Lot</p>
+<div class="kpis"><div class="kpi"><b>${D.lots.toLocaleString()}</b><span>有效 Lot 數</span></div><div class="kpi"><b>${D.wafers.toLocaleString()}</b><span>Wafer 數</span></div><div class="kpi"><b>${fmt(D.dies)}M</b><span>推算總 die 數</span></div><div class="kpi"><b>${fmt(D.shipD)}M</b><span>實際出貨 die 數</span></div><div class="kpi"><b>${fmt(D.cpD)}M</b><span>CP 實際投入 die 數</span></div><div class="kpi"><b>${(D.shipD/D.dies*100).toFixed(1)}%</b><span>出貨率（出貨÷投入）</span></div><div class="kpi"><b>${D.shipW.toLocaleString()}</b><span>出貨 Wafer 數</span></div><div class="kpi"><b>${D.removed}</b><span>已移除 Lot 數</span></div></div>
+<ul><li>Wafer 數＝每個 Lot 的 #1~#25 欄位（X~AV）中有數值的格數</li><li>出貨規則：每片 WAT 良率 &gt;70% 才出貨；晶圓廠出貨 die 數＝合格 Wafer 數 × 578</li><li>CP 實際投入：封裝廠每片取 588 die（多取 10 顆 edge die），CP 實際投入 die 數＝合格 Wafer 數 × 588</li><li>時間軸以 RUN_ON 日期為準；首月（${D.months[0]}）僅 1 個 Lot，末月（${D.months.at(-1)}）僅到 ${D.end}，月量偏低</li><li>移除條件：Part No 或 RUN_ON 空白</li></ul>`,
+()=>{const A=[D.total,D.totalS,D.totalC],nm=['晶圓廠投入量','晶圓廠出貨量','CP 實際投入量'],t=A.map(sm);
+ return `<h2>每月${nm[mode]}</h2><p class="sub">長條圖為各月合計，右側為三種口徑累計量</p>${tabs()}<div class="row"><div class="chart">${chart({[nm[mode]]:A[mode]})}</div><div class="leg">${[2,1,0].map(k=>`<div style="${k==mode?'font-weight:700':''}"><i style="background:${PAL[0]}"></i>${nm[k]}<em>${fmt(t[k])}M${k==1?`・出貨率 ${(t[1]/t[0]*100).toFixed(1)}%`:k==2?`・較出貨 +${(t[2]/t[1]*100-100).toFixed(1)}%`:''}</em></div>`).join('')}</div></div>`},
+()=>{const n=v=>Math.round(v).toLocaleString(),T=D.cmp.reduce((a,r)=>({w:a.w+r.w,W:a.W+r.W,s:a.s+r.s,e:a.e+r.e,c:a.c+r.c}),{w:0,W:0,s:0,e:0,c:0});
+ return `<h2>晶圓廠出貨 vs CP 實際投入 對照表</h2><p class="sub">CP 實際投入 ＝ 晶圓廠出貨（良率篩選後）＋ edge die 增加量（每片 +10 die）；皆以實際出貨片數計算，每批不一定 25 片</p>
+ <div class="chart" style="overflow:auto"><table><thead><tr><th>Part No</th><th>Wafer 數</th><th>出貨 Wafer 數</th><th>晶圓廠出貨 die（578/片）</th><th>+ Edge die 增加量</th><th>＝ CP 實際投入 die（588/片）</th><th>增加比例</th></tr></thead><tbody>
+ ${D.cmp.map(r=>`<tr><td>${r.k}</td><td>${n(r.W)}</td><td>${n(r.w)}</td><td>${n(r.s)}</td><td>${n(r.e)}</td><td>${n(r.c)}</td><td>+${(r.e/r.s*100).toFixed(2)}%</td></tr>`).join('')}
+ <tr class="tt"><td>合計</td><td>${n(T.W)}</td><td>${n(T.w)}</td><td>${n(T.s)}</td><td>${n(T.e)}</td><td>${n(T.c)}</td><td>+${(T.e/T.s*100).toFixed(2)}%</td></tr></tbody></table></div>
+ <ul><li>${D.lt25} 個 Lot 出貨片數少於 25 片；平均每批出貨 ${D.avgPW.toFixed(2)} 片</li><li>被良率門檻（≤70%）擋下的 Wafer 共 ${D.dropW} 片，不送封裝廠，也不計入 CP 投入</li></ul>`},
+()=>{const n=v=>Math.round(v).toLocaleString(),sg=v=>(v>=0?'+':'−')+n(Math.abs(v)),T=D.ex.reduce((a,r)=>({i:a.i+r.i,l:a.l+r.l,e:a.e+r.e,c:a.c+r.c}),{i:0,l:0,e:0,c:0}),net=T.c-T.i;
+ return `<h2>多取的 Edge die 是否足以抵銷 WAT loss？</h2><p class="sub">CP 實際投入 ＝ 晶圓廠投入（原計畫）－ 被良率擋下 Wafer 的 die ＋ 封裝廠多取的 edge die</p>
+ <div class="chart" style="overflow:auto"><table><thead><tr><th>${D.exk}</th><th>晶圓廠投入（原計畫）</th><th>－ WAT loss</th><th>＋ Edge die</th><th>＝ CP 實際投入</th><th>淨變化</th><th>實際出貨率</th><th>損益平衡出貨率</th></tr></thead><tbody>
+ ${D.ex.map(r=>`<tr><td>${r.k}</td><td>${n(r.i)}</td><td>−${n(r.l)}</td><td>+${n(r.e)}</td><td>${n(r.c)}</td><td>${sg(r.c-r.i)}（${((r.c/r.i-1)*100).toFixed(2)}%）</td><td>${(r.rate*100).toFixed(1)}%</td><td>${(r.be*100).toFixed(2)}%</td></tr>`).join('')}
+ <tr class="tt"><td>合計</td><td>${n(T.i)}</td><td>−${n(T.l)}</td><td>+${n(T.e)}</td><td>${n(T.c)}</td><td>${sg(net)}（${(net/T.i*100).toFixed(2)}%）</td><td>${(D.shipW/D.wafers*100).toFixed(1)}%</td><td>－</td></tr></tbody></table></div>
+ <ul><li>結論：Edge die 增加量（${n(T.e)}）大於 WAT loss（${n(T.l)}），CP 實際投入比晶圓廠原計畫多 ${n(net)} die（${(net/T.i*100).toFixed(2)}%）</li><li>損益平衡出貨率＝晶圓廠 die/片 ÷ CP die/片；實際出貨率高於此值時，CP 實際投入就會多於原計畫；若某個項目或月份低於此值則會反過來</li><li>此處 WAT loss 只計整片 Wafer 被擋下，未含 Wafer 內個別 die 的損失與 CP 的 die 良率；edge die 品質通常較差，實際良品的增加量會低於上述 die 數</li></ul>`},
+()=>{const d="Part No";return `<h2>依 Part No 的每月${['晶圓廠投入量','晶圓廠出貨量','CP 實際投入量'][mode]}</h2><p class="sub">堆疊柱狀圖，右側為累計量${['與占比','、占比與出貨率','、占比與較出貨增加比例'][mode]}</p>${tabs()}<div class="row"><div class="chart">${chart(D[d+['','_S','_C'][mode]])}</div>${legend(d,mode)}</div>`}];
+let p=0;const go=i=>{p=Math.max(0,Math.min(slides.length-1,i));stage.innerHTML=slides[p]();pg.textContent=`${p+1} / ${slides.length}`};
+pv.onclick=()=>go(p-1);nx.onclick=()=>go(p+1);
+addEventListener("keydown",e=>{if(["ArrowRight","PageDown"," "].includes(e.key))go(p+1);if(["ArrowLeft","PageUp"].includes(e.key))go(p-1)});
+go(0);
+</script></body></html>
