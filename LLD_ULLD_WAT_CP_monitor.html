@@ -336,8 +336,10 @@ function makeDash(cfg){
     v.sort((a,b)=>a-b);
     let lo=quant(v,.005),hi=quant(v,.995);
     if(zero){lo=Math.min(lo,0);hi=Math.max(hi,0);}
-    const pd=(hi-lo)*.06||1;
-    let min=Math.floor(lo-pd),max=Math.ceil(hi+pd);if(cap!=null)max=Math.min(max,cap);
+    const pd=(hi-lo)*.06||Math.abs(hi)*.05||1;
+    const step=Math.pow(10,Math.floor(Math.log10((hi-lo+2*pd)/4)));
+    const nice=x=>Number(x.toPrecision(12));
+    let min=nice(Math.floor((lo-pd)/step)*step),max=nice(Math.ceil((hi+pd)/step)*step);if(cap!=null)max=Math.min(max,cap);
     const outLo=v.filter(y=>y<min),outHi=v.filter(y=>y>max);
     return {min,max,out:outLo.length+outHi.length,lowest:outLo.length?outLo[0]:null,highest:outHi.length?outHi[outHi.length-1]:null};
   }
