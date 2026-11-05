@@ -5,16 +5,16 @@
 /* Layout: control bar on top, three range-stat figures, then two stacked time charts (yield %, gap pp) sharing one x range. */
 :root{
   --bg:#eef1f5; --surface:#ffffff; --ink:#14181f; --ink2:#4b5563; --muted:#6b7280; --line:#dde2ea; --grid:#e8ecf2; --zero:#9aa3b2;
-  --wat:#2a78d6; --cp:#eb6834; --gap:#6250d6; --accent:#2a78d6; --chip:#f3f5f9; --sel:rgba(42,120,214,.14);
+  --wat:#c4271f; --cp:#3dbb6a; --gap:#6250d6; --accent:#2a78d6; --chip:#f3f5f9; --sel:rgba(42,120,214,.14);
   --font:"PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#101215; --surface:#1a1b1d; --ink:#eceef2; --ink2:#c3c6cf; --muted:#9298a4; --line:#2c2f35; --grid:#26292f; --zero:#6c7380;
-  --wat:#3987e5; --cp:#d95926; --gap:#9085e9; --accent:#3987e5; --chip:#23252a; --sel:rgba(57,135,229,.22); color-scheme:dark}}
+  --wat:#e8504a; --cp:#4fc47e; --gap:#9085e9; --accent:#3987e5; --chip:#23252a; --sel:rgba(57,135,229,.22); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#101215; --surface:#1a1b1d; --ink:#eceef2; --ink2:#c3c6cf; --muted:#9298a4; --line:#2c2f35; --grid:#26292f; --zero:#6c7380;
-  --wat:#3987e5; --cp:#d95926; --gap:#9085e9; --accent:#3987e5; --chip:#23252a; --sel:rgba(57,135,229,.22); color-scheme:dark}
+  --wat:#e8504a; --cp:#4fc47e; --gap:#9085e9; --accent:#3987e5; --chip:#23252a; --sel:rgba(57,135,229,.22); color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;
   padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
